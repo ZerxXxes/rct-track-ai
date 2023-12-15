@@ -1,4 +1,5 @@
 from segments import segment
+from pprint import pprint
 
 def decode_rle(file_path):
     with open(file_path, 'rb') as file:
@@ -58,6 +59,47 @@ def get_track_name_from_byte(byte_value, type_to_track_name):
     byte_str = hex(byte_value)  # Convert to hex string (e.g., 0x02)
     return type_to_track_name.get(byte_str, "Unknown Track Type")
 
+def interpolate_positions(start, end):
+    # Generate positions between start and end (inclusive)
+    # This function assumes movement along one axis at a time
+    positions = []
+    step = 1 if end >= start else -1
+    for pos in range(start, end + step, step):
+        positions.append(pos)
+    return positions
+
+def calculate_segment_positions(track_names, segment_dict):
+    position = [0, 0, 0]  # [x, y, z]
+    direction = 'DIR_STRAIGHT'  # Initial direction
+    positions = [tuple(position)]  # Store initial position
+
+    for name in track_names:
+        segment_info = segment_dict.get(name, {})
+        forward_delta = int(segment_info.get('ForwardDelta', 0))
+        sideways_delta = int(segment_info.get('SidewaysDelta', 0))
+        elevation_delta = int(segment_info.get('ElevationDelta', 0))
+
+        # Handle forward movement
+        if direction == 'DIR_STRAIGHT':
+            new_x_positions = interpolate_positions(position[0], position[0] + forward_delta)
+            for x in new_x_positions[1:]:  # Skip the first position as it's already included
+                positions.append((x, position[1], position[2]))
+            position[0] += forward_delta
+
+        # Handle sideways movement (left/right)
+        # Similar logic can be applied for sideways_delta
+
+        # Handle elevation
+        new_z_positions = interpolate_positions(position[2], position[2] + elevation_delta)
+        for z in new_z_positions[1:]:
+            positions.append((position[0], position[1], z))
+        position[2] += elevation_delta
+
+        # Update direction for the next segment
+        direction = segment_info.get('DirectionDelta', direction)
+
+    return positions
+
 # Invert the dictionary to map from 'Type' to track name
 # Assuming 'segment' is your large nested dictionary
 type_to_track_name = {v['Type']: k for k, v in segment.items()}
@@ -68,5 +110,5 @@ decoded_data = decode_rle(file_path)
 track_data = extract_track_data(decoded_data)
 
 track_names = [get_track_name_from_byte(byte, type_to_track_name) for byte in track_data]
-print(track_names)
+pprint(track_names)
 
