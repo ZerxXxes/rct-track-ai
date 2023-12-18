@@ -60,8 +60,6 @@ def get_track_name_from_byte(byte_value, type_to_track_name):
     return type_to_track_name.get(byte_str, "Unknown Track Type")
 
 def interpolate_positions(start, end):
-    # Generate positions between start and end (inclusive)
-    # This function assumes movement along one axis at a time
     positions = []
     step = 1 if end >= start else -1
     for pos in range(start, end + step, step):
@@ -80,14 +78,23 @@ def calculate_segment_positions(track_names, segment_dict):
         elevation_delta = int(segment_info.get('ElevationDelta', 0))
 
         # Handle forward movement
-        if direction == 'DIR_STRAIGHT':
+        if direction in ['DIR_STRAIGHT', 'DIR_90_DEG_LEFT', 'DIR_90_DEG_RIGHT']:
             new_x_positions = interpolate_positions(position[0], position[0] + forward_delta)
             for x in new_x_positions[1:]:  # Skip the first position as it's already included
                 positions.append((x, position[1], position[2]))
             position[0] += forward_delta
 
-        # Handle sideways movement (left/right)
-        # Similar logic can be applied for sideways_delta
+        # Handle sideways movement
+        if direction == 'DIR_90_DEG_LEFT':
+            new_y_positions = interpolate_positions(position[1], position[1] + sideways_delta)
+            for y in new_y_positions[1:]:
+                positions.append((position[0], y, position[2]))
+            position[1] += sideways_delta
+        elif direction == 'DIR_90_DEG_RIGHT':
+            new_y_positions = interpolate_positions(position[1], position[1] - sideways_delta)
+            for y in new_y_positions[1:]:
+                positions.append((position[0], y, position[2]))
+            position[1] -= sideways_delta
 
         # Handle elevation
         new_z_positions = interpolate_positions(position[2], position[2] + elevation_delta)
@@ -105,10 +112,11 @@ def calculate_segment_positions(track_names, segment_dict):
 type_to_track_name = {v['Type']: k for k, v in segment.items()}
 
 # Example usage
-file_path = 'Contortion.td6'
+file_path = 'markustest3.td6'
 decoded_data = decode_rle(file_path)
 track_data = extract_track_data(decoded_data)
 
 track_names = [get_track_name_from_byte(byte, type_to_track_name) for byte in track_data]
+positions = calculate_segment_positions(track_names, segment)
 pprint(track_names)
-
+pprint(positions)
