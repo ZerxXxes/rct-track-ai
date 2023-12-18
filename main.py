@@ -1,5 +1,7 @@
 from segments import segment
 from pprint import pprint
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 def decode_rle(file_path):
     with open(file_path, 'rb') as file:
@@ -68,7 +70,7 @@ def interpolate_positions(start, end):
 
 def calculate_segment_positions(track_names, segment_dict):
     position = [0, 0, 0]  # [x, y, z]
-    direction = 'DIR_STRAIGHT'  # Initial direction
+    current_orientation = 0  # 0 degrees, facing 'north'/positive x-axis initially
     positions = [tuple(position)]  # Store initial position
 
     for name in track_names:
@@ -77,35 +79,51 @@ def calculate_segment_positions(track_names, segment_dict):
         sideways_delta = int(segment_info.get('SidewaysDelta', 0))
         elevation_delta = int(segment_info.get('ElevationDelta', 0))
 
-        # Handle forward movement
-        if direction in ['DIR_STRAIGHT', 'DIR_90_DEG_LEFT', 'DIR_90_DEG_RIGHT']:
-            new_x_positions = interpolate_positions(position[0], position[0] + forward_delta)
-            for x in new_x_positions[1:]:  # Skip the first position as it's already included
-                positions.append((x, position[1], position[2]))
+        # Apply movement deltas based on current orientation
+        if current_orientation == 0:  # Facing 'north'
             position[0] += forward_delta
-
-        # Handle sideways movement
-        if direction == 'DIR_90_DEG_LEFT':
-            new_y_positions = interpolate_positions(position[1], position[1] + sideways_delta)
-            for y in new_y_positions[1:]:
-                positions.append((position[0], y, position[2]))
             position[1] += sideways_delta
-        elif direction == 'DIR_90_DEG_RIGHT':
-            new_y_positions = interpolate_positions(position[1], position[1] - sideways_delta)
-            for y in new_y_positions[1:]:
-                positions.append((position[0], y, position[2]))
+        elif current_orientation == 90:  # Facing 'west'
+            position[1] += forward_delta
+            position[0] -= sideways_delta
+        elif current_orientation == 180:  # Facing 'south'
+            position[0] -= forward_delta
             position[1] -= sideways_delta
+        elif current_orientation == 270:  # Facing 'east'
+            position[1] -= forward_delta
+            position[0] += sideways_delta
 
-        # Handle elevation
-        new_z_positions = interpolate_positions(position[2], position[2] + elevation_delta)
-        for z in new_z_positions[1:]:
-            positions.append((position[0], position[1], z))
-        position[2] += elevation_delta
+        position[2] += elevation_delta  # Update elevation
+        positions.append(tuple(position))
 
-        # Update direction for the next segment
-        direction = segment_info.get('DirectionDelta', direction)
+        # Update orientation for the next segment
+        direction_delta = segment_info.get('DirectionDelta', None)
+        if direction_delta == 'DIR_90_DEG_LEFT':
+            current_orientation += 90
+        elif direction_delta == 'DIR_90_DEG_RIGHT':
+            current_orientation -= 90
+        current_orientation %= 360  # Normalize the orientation
 
     return positions
+
+def plot_track(positions):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Extracting x, y, and z coordinates
+    x_coords = [pos[0] for pos in positions]
+    y_coords = [pos[1] for pos in positions]
+    z_coords = [pos[2] for pos in positions]
+
+    # Plotting the track
+    ax.plot(x_coords, y_coords, z_coords, marker='o')
+
+    ax.set_xlabel('X Axis')
+    ax.set_ylabel('Y Axis')
+    ax.set_zlabel('Z Axis')
+    plt.title('3D Track Visualization')
+
+    plt.show()
 
 # Invert the dictionary to map from 'Type' to track name
 # Assuming 'segment' is your large nested dictionary
@@ -120,3 +138,4 @@ track_names = [get_track_name_from_byte(byte, type_to_track_name) for byte in tr
 positions = calculate_segment_positions(track_names, segment)
 pprint(track_names)
 pprint(positions)
+plot_track(positions)
