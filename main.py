@@ -61,6 +61,27 @@ def encode_rle(data):
 
     return encoded
 
+def calculate_checksum(data):
+    summation = 0
+
+    for byte in data:
+        # Add byte to the lower 8 bits of summation without carry
+        temp = summation + byte
+        summation = (summation & 0xFFFFFF00) | (temp & 0xFF)
+
+        # Rotate summation to the left by 3 bits
+        summation = ((summation << 3) & 0xFFFFFFFF) | (summation >> 29)
+
+    # Modify summation after processing the file
+    summation -= 108156
+
+    # Convert the summation to a 4-byte sequence, least significant byte first
+    checksum = bytearray([
+        (summation >> i) & 0xFF for i in (0, 8, 16, 24)
+    ])
+
+    return checksum
+
 def extract_track_data(decoded_data):
     start_offset = 0xA3  # A3 in hexadecimal is 163 in decimal
     track_data = []
