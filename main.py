@@ -30,6 +30,37 @@ def decode_rle(file_path):
 
     return decoded
 
+def encode_rle(data):
+    encoded = bytearray()
+    i = 0
+
+    while i < len(data):
+        # Look for runs of repeated bytes
+        run_length = 1
+        while i + run_length < len(data) and data[i] == data[i + run_length] and run_length < 127:
+            run_length += 1
+
+        if run_length > 1:
+            encoded.append(0b10000000 | (run_length - 1))  # Set MSB and store run length
+            encoded.append(data[i])
+            i += run_length
+        else:
+            # Look for runs of unique bytes
+            start = i
+            while i < len(data) - 1 and data[i] != data[i + 1] and (i - start) < 126:
+                i += 1
+
+            unique_run_length = i - start + 1
+            encoded.append(unique_run_length - 1)  # Store run length
+            encoded.extend(data[start:start + unique_run_length])
+            i += 1
+
+    # Add checksum (assuming checksum logic is implemented elsewhere)
+    checksum = calculate_checksum(encoded)
+    encoded.extend(checksum)
+
+    return encoded
+
 def extract_track_data(decoded_data):
     start_offset = 0xA3  # A3 in hexadecimal is 163 in decimal
     track_data = []
@@ -130,7 +161,7 @@ def plot_track(positions):
 type_to_track_name = {v['Type']: k for k, v in segment.items()}
 
 # Example usage
-file_path = 'markustest3.td6'
+file_path = 'markustest4.td6'
 decoded_data = decode_rle(file_path)
 track_data = extract_track_data(decoded_data)
 
